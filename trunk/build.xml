@@ -24,11 +24,11 @@
   <target name="build" depends="compile"
     description="Compiles the source code and creates a jar file">
 
-    <jar jarfile="${jardir}/mitello.jar">
+    <jar jarfile="${jardir}/petruk.jar">
 	<fileset dir="${destdir}" includes="**/*.class"/>
 	<manifest>
 		<attribute name="Built-By" value="Abdul Arfan"/>
-		<attribute name="Main-Class" value="GUIMitello"/>
+		<attribute name="Main-Class" value="GUIPetruk"/>
 		<section name="common">
 			<attribute name="Specification-Title" value="Othello Player"/>
 			<attribute name="Specification-Version" value="1.0.0"/>
