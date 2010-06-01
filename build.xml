@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<project name="mitello" default="build" basedir=".">
+
+  <property name="srcdir" value="."/>
+  <property name="destdir" value="."/>
+  <property name="jardir" value="."/>
+
+
+  <target name="clean" description="Deletes the class files">
+    <delete>
+      <fileset dir="${destdir}" includes="**/*.class"/>
+    </delete>
+  </target>
+
+
+  <target name="compile" description="Compiles the source code">
+    <javac srcdir="${srcdir}"
+            destdir="${destdir}"
+            debug="on">
+    </javac>
+  </target>
+
+
+  <target name="build" depends="compile"
+    description="Compiles the source code and creates a jar file">
+
+    <jar jarfile="${jardir}/mitello.jar">
+	<fileset dir="${destdir}" includes="**/*.class"/>
+	<manifest>
+		<attribute name="Built-By" value="Abdul Arfan"/>
+		<attribute name="Main-Class" value="GUIMitello"/>
+		<section name="common">
+			<attribute name="Specification-Title" value="Othello Player"/>
+			<attribute name="Specification-Version" value="1.0.0"/>
+			<attribute name="Specification-Vendor" value="Computer Science University Of Indonesia"/>
+			<attribute name="Implementation-Title" value="nevermind"/>
+			<attribute name="Implementation-Version" value="1.0.0 ${TODAY}"/> 
+			<attribute name="Implementation-Vendor" value="Kambing Corp."/>
+		</section>
+	</manifest>
+    </jar>
+  </target>
+
+
+  <target name="rebuild" depends="clean, build"
+    description="Performs a clean build"/>
+
+</project>
+
