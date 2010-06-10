@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<project name="mitello" default="build" basedir=".">
+<project name="petruk" default="build" basedir=".">
 
   <property name="srcdir" value="."/>
   <property name="destdir" value="."/>
