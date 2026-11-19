@@ -1,0 +1,26 @@
+# Maven
+target/
+.m2/
+
+# Compiled Java artifacts
+*.class
+*.jar
+
+# IDE metadata
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+*.swo

@@ -1,3 +1,4 @@
+package com.petruk.othello;
 
 
 /**
