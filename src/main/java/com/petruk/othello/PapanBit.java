@@ -54,6 +54,7 @@ public final class PapanBit
 		this.jalanHitam=(TreeMap<Byte,Byte>) p.jalanHitam.clone();
 		this.putihUpdate=p.putihUpdate;
 		this.hitamUpdate=p.hitamUpdate;
+		this.gameover=p.gameover;
 	}
 	
 	/*
@@ -93,8 +94,8 @@ public final class PapanBit
 	}
 	public void setBatu(int x,int y,boolean batu)
 	{
-		hitam.set(ctp(x,y),!batu);
-		putih.set(ctp(x,y),!batu);
+		if (batu == BATU_PUTIH) setPutih(x, y);
+		else setHitam(x, y);
 	}
 
 	/**

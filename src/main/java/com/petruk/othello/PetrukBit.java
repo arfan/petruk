@@ -1,349 +1,213 @@
 package com.petruk.othello;
 
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.List;
+import java.util.StringTokenizer;
 
-import java.util.*;
-
+/** Search engine for the Othello player. Scores are always from black's perspective. */
 public final class PetrukBit
 {
-	int evaluator[][] = new int[8][8];
-	int deepLimit = 6;
-	int stage = 0;
-	public static int alpha = Integer.MIN_VALUE;
-	public static int beta  = Integer.MAX_VALUE;
-	PapanBit papan;
-	
-	Hashtable table = new Hashtable<PetrukBit, Integer>();
-	
-	public PetrukBit()
-	{
-		String nilaiEvaluator =
+    private final int[][] evaluator = new int[8][8];
+    int deepLimit = 6;
+    int stage = 0;
+    PapanBit papan;
 
-		" 64 -30  10   5   5  10 -30  64 "+
+    public PetrukBit()
+    {
+        String values =
+            " 64 -30  10   5   5  10 -30  64 " +
+            "-30 -40   2   2   2   2 -40 -30 " +
+            " 10   2   5   1   1   5   2  10 " +
+            "  5   2   1   0   0   1   2   5 " +
+            "  5   2   1   0   0   1   2   5 " +
+            " 10   2   5   1   1   5   2  10 " +
+            "-30 -40   2   2   2   2 -40 -30 " +
+            " 64 -30  10   5   5  10 -30  64 ";
 
-		"-30 -40   2   2   2   2 -40 -30 "+
+        StringTokenizer tokens = new StringTokenizer(values);
+        int index = 0;
+        while (tokens.hasMoreTokens())
+        {
+            evaluator[index / 8][index % 8] = Integer.parseInt(tokens.nextToken());
+            index++;
+        }
+        papan = new PapanBit();
+    }
 
-		" 10   2   5   1   1   5   2  10 "+
+    /** Evaluates a position from black's perspective. */
+    public int value(PapanBit p)
+    {
+        int black = p.hitam.cardinality();
+        int white = p.putih.cardinality();
+        int discDifference = black - white;
+        int occupied = black + white;
+        if (p.gameOver()) return discDifference * 10000;
 
-		"  5   2   1   0   0   1   2   5 "+
+        int positional = 0;
+        for (int i = p.hitam.nextSetBit(0); i >= 0; i = p.hitam.nextSetBit(i + 1))
+            positional += evaluator[i / 8][i % 8];
+        for (int i = p.putih.nextSetBit(0); i >= 0; i = p.putih.nextSetBit(i + 1))
+            positional -= evaluator[i / 8][i % 8];
 
-		"  5   2   1   0   0   1   2   5 "+
+        int mobility = p.mobility(PapanBit.BATU_HITAM) - p.mobility(PapanBit.BATU_PUTIH);
+        int corners = cornerCount(p, PapanBit.BATU_HITAM) - cornerCount(p, PapanBit.BATU_PUTIH);
+        int frontier = frontierCount(p, PapanBit.BATU_HITAM) - frontierCount(p, PapanBit.BATU_PUTIH);
 
-		" 10   2   5   1   1   5   2  10 "+
+        if (occupied < 20) return positional + mobility * 8 + corners * 100 - frontier * 3;
+        if (occupied < 50) return positional + mobility * 5 + corners * 120 - frontier * 5 + discDifference;
+        return positional + mobility * 2 + corners * 150 - frontier * 8 + discDifference * 8;
+    }
 
-		"-30 -40   2   2   2   2 -40 -30 "+
+    private int cornerCount(PapanBit p, boolean side)
+    {
+        BitSet stones = side == PapanBit.BATU_HITAM ? p.hitam : p.putih;
+        int count = 0;
+        if (stones.get(0)) count++;
+        if (stones.get(7)) count++;
+        if (stones.get(56)) count++;
+        if (stones.get(63)) count++;
+        return count;
+    }
 
-		" 64 -30  10   5   5  10 -30  64 ";
-		
+    private int frontierCount(PapanBit p, boolean side)
+    {
+        BitSet stones = side == PapanBit.BATU_HITAM ? p.hitam : p.putih;
+        int count = 0;
+        for (int i = stones.nextSetBit(0); i >= 0; i = stones.nextSetBit(i + 1))
+        {
+            int x = i / 8;
+            int y = i % 8;
+            boolean frontier = false;
+            for (int dx = -1; dx <= 1 && !frontier; dx++)
+                for (int dy = -1; dy <= 1; dy++)
+                {
+                    int nx = x + dx;
+                    int ny = y + dy;
+                    if (nx >= 0 && nx < 8 && ny >= 0 && ny < 8 &&
+                        !p.hitam.get(nx * 8 + ny) && !p.putih.get(nx * 8 + ny))
+                    {
+                        frontier = true;
+                        break;
+                    }
+                }
+            if (frontier) count++;
+        }
+        return count;
+    }
 
-		/*String nilaiEvaluator =
+    private List<Byte> orderedMoves(final PapanBit node, boolean side)
+    {
+        final List<Byte> moves = new ArrayList<Byte>();
+        Iterator iterator = node.iterator(side);
+        while (iterator.hasNext()) moves.add((Byte) iterator.next());
+        Collections.sort(moves, new Comparator<Byte>()
+        {
+            public int compare(Byte first, Byte second)
+            {
+                return moveOrderingScore(second) - moveOrderingScore(first);
+            }
+        });
+        return moves;
+    }
 
-		" 50 -10   5   2   2   5 -10  50 "+
+    private int moveOrderingScore(byte move)
+    {
+        int position = move & 0xff;
+        if (position == 0 || position == 7 || position == 56 || position == 63) return 10000;
+        int x = position / 8;
+        int y = position % 8;
+        if ((x == 1 || x == 6) && (y == 1 || y == 6)) return -1000;
+        return evaluator[x][y];
+    }
 
-		"-10  -5   2   2   2   2  -5  -1 "+
+    public Move alphabeta(PapanBit node, boolean side)
+    {
+        if (side == PapanBit.BATU_HITAM)
+            return alphabetamax(node, side, 0, Integer.MIN_VALUE, Integer.MAX_VALUE);
+        return alphabetamin(node, side, 0, Integer.MIN_VALUE, Integer.MAX_VALUE);
+    }
 
-		"  5   2   5   1   1   5   2   5 "+
+    public Move alphabetamax(PapanBit node, boolean side, int deep, int alpha, int beta)
+    {
+        int current = value(node);
+        if (node.gameOver() || deep >= deepLimit) return new Move(current);
+        if (!node.bisaJalan(side))
+        {
+            if (!node.bisaJalan(!side)) return new Move(current);
+            return alphabetamin(node, !side, deep + 1, alpha, beta);
+        }
 
-		"  2   2   1   1   1   1   2   2 "+
+        int best = Integer.MIN_VALUE;
+        Move move = new Move(current);
+        for (Byte place : orderedMoves(node, side))
+        {
+            PapanBit next = node.clone();
+            next.jalankan(place / 8, place % 8, side);
+            int score = alphabetamin(next, !side, deep + 1, alpha, beta).value;
+            if (score > best)
+            {
+                best = score;
+                move.move = place;
+            }
+            if (best > alpha) alpha = best;
+            if (alpha >= beta) break;
+        }
+        move.value = best;
+        return move;
+    }
 
-		"  2   2   1   1   1   1   2   2 "+
+    public Move alphabetamin(PapanBit node, boolean side, int deep, int alpha, int beta)
+    {
+        int current = value(node);
+        if (node.gameOver() || deep >= deepLimit) return new Move(current);
+        if (!node.bisaJalan(side))
+        {
+            if (!node.bisaJalan(!side)) return new Move(current);
+            return alphabetamax(node, !side, deep + 1, alpha, beta);
+        }
 
-		"  5   2   5   1   1   5   2   5 "+
- 
-		"-10  -5   2   2   2   2  -5 -10 "+
+        int best = Integer.MAX_VALUE;
+        Move move = new Move(current);
+        for (Byte place : orderedMoves(node, side))
+        {
+            PapanBit next = node.clone();
+            next.jalankan(place / 8, place % 8, side);
+            int score = alphabetamax(next, !side, deep + 1, alpha, beta).value;
+            if (score < best)
+            {
+                best = score;
+                move.move = place;
+            }
+            if (best < beta) beta = best;
+            if (alpha >= beta) break;
+        }
+        move.value = best;
+        return move;
+    }
 
-		" 50 -10   5   2   2   5 -10  50 ";*/
-		
-		
-		StringTokenizer tokenEval = new StringTokenizer(nilaiEvaluator);
-		int index=0;
-		while (tokenEval.hasMoreTokens())
-		{
-			int value = Integer.parseInt(tokenEval.nextToken());
-			evaluator[index%8][index/8]=value;
-			index++;
-		}
-		
-		papan = new PapanBit();
-		System.out.println(papan);
-		//selfPlay(papan, PapanBit.BATU_HITAM);
-		//playAsBlack(papan);
-	}
-
-	/*
-	semakin kecil nilainya berarti semakin bagus untuk putih
-	semakin besar nilainya berarti semakin bagus untuk hitam
-
-	karena hitam jalan duluan
-	*/
-	public int value(PapanBit p)
-	{
-		//int mobility = p.mobility(PapanBit.BATU_HITAM)-p.mobility(PapanBit.BATU_PUTIH);
-		
-		if(stage <= 45)
-		{
-			int value=0;
-		
-			for(int i=p.hitam.nextSetBit(0); i>=0; i=p.hitam.nextSetBit(i+1))
-			{
-				value += evaluator[i/8][i%8];
-			}
-			for(int i=p.putih.nextSetBit(0); i>=0; i=p.putih.nextSetBit(i+1))
-			{
-				value -= evaluator[i/8][i%8];
-			}
-			
-			return value;
-		}
-		return p.hitam.cardinality() - p.putih.cardinality();
-	}
-
-	Move getMax(PapanBit node, boolean side,int deep)
-	{
-		int temp = value(node);
-
-		if(node.gameOver()) return new Move(temp);
-
-		if(!node.bisaJalan(side)) return getMin(node, !side, deep+1);
-
-		PapanBit salin;
-
-		int max = Integer.MIN_VALUE;
-
-		Move move = new Move();
-
-		Iterator iterate=node.iterator(side);
-
-		while(iterate.hasNext())
-		{
-			salin=node.clone();
-			byte place = (Byte) iterate.next();
-			
-			int x=place/8;
-			int y=place%8;
-			
-			salin.jalankan(x,y,side);
-			temp = value(salin);
-
-			if(deep<deepLimit)
-			{
-				temp = getMin(salin,!side,deep+1).value;
-			}
-
-			if(temp>max)
-			{
-				//System.out.println("temp="+temp);
-				max = temp;
-				move.move = 8*x + y;
-			}
-		}
-		move.value=max;
-		return move;
-	}
-
-	Move getMin(PapanBit node, boolean side, int deep)
-	{
-		int temp = 0;
-		
-		if(node.gameOver()) return new Move(value(node));
-
-		if(!node.bisaJalan(side)) return getMax(node, !side, deep+1);
-
-		PapanBit salin;
-
-		int min = Integer.MAX_VALUE;
-
-		Move move = new Move();
-
-		//for(int x=0;x<=7;x++) for(int y=0;y<=7;y++)
-		Iterator iterate=null;
-		if(side==PapanBit.BATU_PUTIH) iterate = node.jalanPutih.keySet().iterator();
-		else iterate = node.jalanHitam.keySet().iterator();
-
-		while(iterate.hasNext())
-		{
-			salin=node.clone();
-			byte place = (Byte) iterate.next();
-			
-			int x=place/8;
-			int y=place%8;
-			
-			salin.jalankan(x,y,side);
-			
-			if(deep>=deepLimit) temp = value(salin);
-			else if(deep<deepLimit)
-			{
-				temp = getMax(salin,!side,deep+1).value;
-			}
-
-			if(temp<min)
-			{
-				//System.out.println("temp="+temp);
-				min = temp;
-				move.move = 8*x + y;
-			}
-		}
-		move.value=min;
-		return move;
-	}
-	
-	public Move alphabeta(PapanBit node, boolean side)
-	{
-		Move m;
-		if(side==PapanBit.BATU_HITAM) m = alphabetamax(papan,side,0,alpha,beta);
-		else m = alphabetamin(papan,side,0,alpha,beta);
-			
-		//if(stage>=44) System.out.println("nilai="+m.value);
-		return m;
-	}
-
-	public Move alphabetamax(PapanBit node, boolean side, int deep,int alpha,int beta)
-	{
-		int temp = value(node);
-
-		if(node.gameOver()||alpha>beta) return new Move(temp);
-
-		if(!node.bisaJalan(side)) return alphabetamin(node, !side, deep+1,alpha,beta);
-
-		PapanBit salin;
-
-		int max = Integer.MIN_VALUE;
-
-		Move move = new Move();
-
-		Iterator iterate=null;
-		if(side==PapanBit.BATU_PUTIH) iterate = node.jalanPutih.keySet().iterator();
-		else iterate = node.jalanHitam.keySet().iterator();
-
-		while(iterate.hasNext())
-		{
-			
-			salin=node.clone();
-			
-			byte place = (Byte) iterate.next();
-			
-			int x=place/8;
-			int y=place%8;
-			
-			salin.jalankan(x,y,side);
-			
-			if(deep>=deepLimit) temp = value(salin);
-			else if(deep<deepLimit)
-			{
-				temp = alphabetamin(salin,!side,deep+1,alpha,beta).value;
-			}
-
-			if(temp>max)
-			{
-				//System.out.println("temp="+temp);
-				max = temp;
-				move.move = 8*x + y;
-				//table.put(salin, temp);
-			}
-
-			if(temp >= beta)
-			{
-				//System.out.println("beta pruning");
-				break;
-			}
-
-			if(max>alpha) alpha=max;
-		}
-		move.value=max;
-		return move;
-	}
-
-	public Move alphabetamin(PapanBit node, boolean side, int deep,int alpha,int beta)
-	{
-		int temp = value(node);
-
-		if(node.gameOver()||alpha>beta) return new Move(temp);
-
-		if(!node.bisaJalan(side)) return alphabetamax(node, !side, deep+1,alpha,beta);
-
-		PapanBit salin;
-
-		int min = Integer.MAX_VALUE;
-
-		Move move = new Move();
-
-		Iterator iterate=null;
-		if(side==PapanBit.BATU_PUTIH) iterate = node.jalanPutih.keySet().iterator();
-		else iterate = node.jalanHitam.keySet().iterator();
-
-		while(iterate.hasNext())
-		{
-			salin=node.clone();
-			
-			byte place = (Byte) iterate.next();
-			
-			int x=place/8;
-			int y=place%8;
-			
-			salin.jalankan(x,y,side);
-			
-			if(deep>=deepLimit) temp = value(salin);
-			else if(deep<deepLimit)
-			{
-				temp = alphabetamax(salin,!side,deep+1,alpha,beta).value;
-			}
-
-			if(temp<min)
-			{
-				//System.out.println("temp="+temp);
-				min = temp;
-				move.move = 8*x + y;
-				//table.put(salin, temp);
-			}
-
-			if(temp <=alpha)
-			{
-				//System.out.println("alpha pruning");
-				break;
-			}
-
-			if(min<beta) beta=min;
-		}
-		move.value=min;
-		return move;
-	}
-
-	public String score(PapanBit p)
-	{
-		int angkaPutih = p.putih.cardinality();
-		int angkaHitam = p.hitam.cardinality();
-		
-		StringBuffer laporan = new StringBuffer();
-		
-		laporan.append("Batu putih ada "+angkaPutih+"\n");
-		laporan.append("Batu hitam ada "+angkaHitam+"\n");
-
-		if (angkaPutih==angkaHitam) laporan.append("Seri\n");
-		else laporan.append((angkaPutih>angkaHitam? "Putih ":"Hitam ")+"Menang");
-		return laporan.toString();
-	}	
+    public String score(PapanBit p)
+    {
+        int white = p.putih.cardinality();
+        int black = p.hitam.cardinality();
+        StringBuffer report = new StringBuffer();
+        report.append("Batu putih ada ").append(white).append("\n");
+        report.append("Batu hitam ada ").append(black).append("\n");
+        if (white == black) report.append("Seri\n");
+        else report.append(white > black ? "Putih Menang" : "Hitam Menang");
+        return report.toString();
+    }
 }
 
 class Move
 {
-	public int value;
-	public int move;
-
-	public Move(int value,int move)
-	{
-		this.value=value;
-		this.move=move;
-	}
-	public Move(int value)
-	{
-		this(value,0);
-	}
-	public Move()
-	{
-		this(0);
-	}
-
-	public String toString()
-	{
-		return "value="+value + " move="+move;
-	}
+    public int value;
+    public int move;
+    public Move(int value, int move) { this.value = value; this.move = move; }
+    public Move(int value) { this(value, 0); }
+    public Move() { this(0); }
+    public String toString() { return "value=" + value + " move=" + move; }
 }

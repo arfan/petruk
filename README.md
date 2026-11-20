@@ -43,6 +43,28 @@ The `self` argument starts the built-in self-play mode:
 java -cp target/petruk-1.0.0.jar com.petruk.othello.GUIPetruk self
 ```
 
+## Command-line mode
+
+Start a terminal game with the computer playing white:
+
+```powershell
+java -jar target/petruk-1.0.0.jar --cli
+```
+
+To have the computer play black:
+
+```powershell
+java -jar target/petruk-1.0.0.jar --cli black
+```
+
+Enter moves using coordinates such as `d3`. Type `q` to quit.
+
+Run computer-vs-computer self-play in the terminal:
+
+```powershell
+java -jar target/petruk-1.0.0.jar --cli-selfplay
+```
+
 ## Controls
 
 - Click a valid square to place a stone.

@@ -383,6 +383,17 @@ public final class GUIPetruk extends JFrame implements ActionListener
 	}
 	public static void main(String args[])
 	{
+		if(args.length>0 && args[0].equals("--cli"))
+		{
+			try { CliPetruk.play(args.length>1 && args[1].equalsIgnoreCase("black")); }
+			catch(Exception e) { e.printStackTrace(); }
+			return;
+		}
+		if(args.length>0 && args[0].equals("--cli-selfplay"))
+		{
+			CliPetruk.selfPlay();
+			return;
+		}
 		GUIPetruk game = new GUIPetruk(args.length>0 && args[0].equals("black"));
 		
 		if(args.length>0 && args[0].equals("self"))
